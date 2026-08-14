@@ -1,5 +1,6 @@
 import Foundation
 import AppIntents
+import ActivityKit
 
 /// The lock-screen secondary button runs this intent to bring the app forward
 /// into the wake flow.
@@ -7,7 +8,9 @@ import AppIntents
 /// This is the *only* path from the alarm alert into the app. iOS also renders a
 /// Stop button that dismisses the alarm without launching anything, and there is
 /// no API to suppress it — see docs/architecture.md.
-struct OpenWakeIntent: AppIntent {
+// SPIKE-VERIFY: CI confirmed LiveActivityIntent is required (not just AppIntent)
+// for the alarm's secondaryIntent parameter. Runtime behaviour still unproven.
+struct OpenWakeIntent: LiveActivityIntent {
 
     static var title: LocalizedStringResource = "Open wake-up"
     static var description = IntentDescription("Opens WakeSpike at the QR verification screen.")
