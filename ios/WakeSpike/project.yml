@@ -1,0 +1,40 @@
+# Optional convenience only. The primary path in docs/mac-setup.md needs no tool
+# installs at all — create the project in Xcode and drag the sources in.
+#
+# If the borrowed Mac happens to have XcodeGen (`brew install xcodegen`), this
+# saves about ten minutes:
+#
+#   cd ios/WakeSpike && xcodegen generate && open WakeSpike.xcodeproj
+#
+# Set your own bundle ID below before generating; it must be unique to your
+# Apple ID. Remember the free Personal Team allows 10 App IDs per 7 days.
+
+name: WakeSpike
+
+options:
+  bundleIdPrefix: com.wakespike
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+targets:
+  WakeSpike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    info:
+      path: Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wakespike.app
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        # Automatic signing with your free Personal Team; set DEVELOPMENT_TEAM in
+        # Xcode rather than committing a team ID here.
+        CODE_SIGN_STYLE: Automatic
