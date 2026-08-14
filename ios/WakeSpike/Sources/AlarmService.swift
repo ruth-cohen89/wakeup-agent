@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import AlarmKit
+import ActivityKit
 import AppIntents
 
 /// Every AlarmKit call site in the spike lives in this file.
@@ -369,19 +370,18 @@ final class AlarmService {
                 tintColor: planned.stage.tint
             )
 
-            // SPIKE-VERIFY: AlertSound factory name and whether a bare filename or a
-            // filename-with-extension is expected. Also whether .wav is accepted at
-            // all — if not, convert with `afconvert -f caff -d LEI16 in.wav out.caf`
-            // and change these to .caf (see docs/mac-setup.md).
+            // SPIKE-VERIFY: AlertSound — CI confirmed AlertConfiguration.AlertSound.named(_:)
+            // compiles with `import ActivityKit`. Whether .wav is accepted at runtime, or
+            // must be .caf, is still device-only (see docs/mac-setup.md).
             let sound = AlertConfiguration.AlertSound.named(planned.soundFileName)
 
-            // SPIKE-VERIFY: this is the least certain line in the file. Documentation
-            // describes AlarmConfiguration as holding schedule, attributes and sound,
-            // but the exact initializer/factory shape (and how the App Intent for the
-            // secondary button is attached) could not be confirmed from Windows.
-            let configuration = AlarmConfiguration(
+            // SPIKE-VERIFY: CI confirmed AlarmManager.AlarmConfiguration.alarm() factory
+            // compiles. Runtime behaviour (stopIntent: nil default, secondaryIntent
+            // launching the app) still needs device verification.
+            let configuration = AlarmManager.AlarmConfiguration<WakeMetadata>.alarm(
                 schedule: .fixed(planned.fireDate),
                 attributes: attributes,
+                stopIntent: nil,
                 secondaryIntent: OpenWakeIntent(stageRaw: planned.stage.rawValue),
                 sound: sound
             )
