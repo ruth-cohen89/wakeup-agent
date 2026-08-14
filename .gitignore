@@ -1,0 +1,22 @@
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Never commit anything resembling credentials
+*.pem
+*.key
+*.p12
+*.mobileprovision
+.env
+.env.*
