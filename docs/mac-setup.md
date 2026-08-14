@@ -1,5 +1,16 @@
 # Mac setup — WakeSpike
 
+> ## ⚠️ SUPERSEDED — you do not need a Mac
+>
+> This page is kept for reference only. The project is built on **GitHub Actions**
+> (`ci-build.md`) and installed from **Windows via Sideloadly**
+> (`install-from-windows.md`). No Mac is required at any point.
+>
+> Follow this page only if you somehow end up with access to a Mac and prefer to
+> build locally. Note that Path A below is now redundant: `project.yml` generates
+> the Xcode project, so step 2–5's manual project creation is unnecessary — just
+> run `xcodegen generate`.
+
 Everything here needs macOS + Xcode + your iPhone on **iOS 26 or later**. Budget
 ~20 minutes for setup, then run `00-phase0-spike.md`.
 

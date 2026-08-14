@@ -1,16 +1,41 @@
 # AlarmKit findings
 
-**Status: EMPTY — awaiting the physical-device session.**
+Evidence lands here in two stages, and they prove different things:
 
-Nothing in this file is confirmed until it is filled in from a real iPhone. Until
-then, Phase 0 is not complete and Phase 1 does not start.
+| Stage | Where | Proves | Does NOT prove |
+|---|---|---|---|
+| **A — Compile** | GitHub Actions `macos-26` | The API signatures exist and typecheck against a real iOS 26 SDK | Any runtime behaviour whatsoever |
+| **B — Device** | iPhone via Sideloadly | What actually happens at 08:00 | — |
+
+A green build does **not** close a `// SPIKE-VERIFY:` marker. It narrows it: the
+signature is right, the behaviour is still unknown. Markers close only in stage B.
+
+**Stage A status: not yet run.**
+**Stage B status: EMPTY — awaiting the physical device.**
+
+Phase 0 is not complete and Phase 1 does not start until stage B is filled in.
 
 Test numbers refer to `00-phase0-spike.md`. Fill in *every* row, including honest
 "not achievable" answers.
 
 ---
 
-## Environment
+## Stage A — compile results
+
+| | |
+|---|---|
+| Date of run | |
+| Workflow run URL | |
+| Runner image | `macos-26` |
+| macOS version | |
+| Xcode version | |
+| iOS SDK compiled against | |
+| Result | not yet run |
+| Unsigned `.ipa` produced? | |
+
+---
+
+## Stage B — device environment
 
 | | |
 |---|---|
@@ -41,23 +66,29 @@ Test numbers refer to `00-phase0-spike.md`. Fill in *every* row, including hones
 | 9 | Do pending alarms survive a full power cycle? | unknown | Decides SYSTEM_UNAVAILABLE handling |
 | 10 | Is `.wav` accepted, or is `.caf` required? | unknown | |
 | 11 | Does a `.relative` weekly alarm re-arm after Stop? | unknown | Possible cheap alternative to long chains |
+| 12 | **Does AlarmKit work under a free Personal Team profile?** | unknown | New risk from the sideload route — free profiles restrict entitlements and Sideloadly re-signs the app. If alarm scheduling fails after a successful install, this is why |
 
 ---
 
-## Corrected API signatures
+## Corrected API signatures — from stage A (compile)
 
-Every `// SPIKE-VERIFY:` marker that the compiler rejected. This section is what
-the real product gets built on — record the *actual* signature, not a paraphrase.
+Every `// SPIKE-VERIFY:` marker the compiler rejected. This section is what the
+real product gets built on — record the *actual* signature, not a paraphrase.
 
-| Assumed | Actual | File / line |
+Status values: `unverified` → `compiles` (stage A) → `behaviour confirmed` (stage B).
+
+| Assumed | Actual | Status |
 |---|---|---|
-| `AlarmManager.shared.authorizationState` | | AlarmService.swift |
-| `try await AlarmManager.shared.requestAuthorization()` | | AlarmService.swift |
-| `AlarmMetadata` conformance requirements | | AlarmService.swift |
-| `secondaryButtonBehavior: .custom` | | AlarmService.swift |
-| `AlertConfiguration.AlertSound.named(_:)` | | AlarmService.swift |
-| `AlarmConfiguration(schedule:attributes:secondaryIntent:sound:)` | | AlarmService.swift |
-| `AlarmManager.shared.cancel(id:)` | | AlarmService.swift |
+| `AlarmManager.shared.authorizationState` | | unverified |
+| `try await AlarmManager.shared.requestAuthorization()` | | unverified |
+| `AlarmMetadata` conformance requirements | | unverified |
+| `secondaryButtonBehavior: .custom` | | unverified |
+| `AlertConfiguration.AlertSound.named(_:)` | | unverified |
+| `AlarmConfiguration(schedule:attributes:secondaryIntent:sound:)` | | unverified |
+| `AlarmManager.shared.cancel(id:)` | | unverified |
+
+All seven live in `ios/WakeSpike/Sources/AlarmService.swift`, the only file that
+touches AlarmKit.
 
 ---
 

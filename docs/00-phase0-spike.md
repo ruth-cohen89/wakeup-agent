@@ -2,7 +2,15 @@
 
 Run these in order on the iPhone. Record every result in `alarmkit-findings.md`.
 
-Setup first: `mac-setup.md`.
+Get the app onto the phone first: `ci-build.md` (compile) then
+`install-from-windows.md` (sign + install). No Mac needed.
+
+**Test 0 — does it even run?** Before anything else, confirm the app launches and
+that **Request AlarmKit authorization** does not fail outright. Free Personal Team
+profiles restrict entitlements, and Sideloadly re-signs the app, so it is not yet
+proven that AlarmKit works under free provisioning at all. If authorization fails
+with a permissions or entitlement error, stop and record it as finding 12 — that
+result would change the whole delivery route.
 
 **Before you start:** open the app, tap **Run planner self-check**. It must say
 PASS. That validates the stage-boundary logic without needing any alarm to fire —

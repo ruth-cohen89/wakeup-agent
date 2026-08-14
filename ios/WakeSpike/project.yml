@@ -1,13 +1,16 @@
-# Optional convenience only. The primary path in docs/mac-setup.md needs no tool
-# installs at all — create the project in Xcode and drag the sources in.
+# XcodeGen manifest — this is now the primary way the project is built.
 #
-# If the borrowed Mac happens to have XcodeGen (`brew install xcodegen`), this
-# saves about ten minutes:
+# There is no .xcodeproj in the repo and there does not need to be one. CI runs
+# `xcodegen generate` on a GitHub macOS runner, so the project never has to be
+# created by hand in the Xcode GUI. That was the last step that genuinely
+# required a Mac; see docs/ci-build.md.
 #
+# To build locally (only if you ever do get access to a Mac):
 #   cd ios/WakeSpike && xcodegen generate && open WakeSpike.xcodeproj
 #
-# Set your own bundle ID below before generating; it must be unique to your
-# Apple ID. Remember the free Personal Team allows 10 App IDs per 7 days.
+# Signing is deliberately absent here. A free Apple Personal Team cannot be signed
+# in CI (docs/signing-feasibility.md); the unsigned .ipa is signed on Windows by
+# Sideloadly (docs/install-from-windows.md).
 
 name: WakeSpike
 
@@ -35,6 +38,21 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
-        # Automatic signing with your free Personal Team; set DEVELOPMENT_TEAM in
-        # Xcode rather than committing a team ID here.
-        CODE_SIGN_STYLE: Automatic
+        # CI builds unsigned. Sideloadly applies the real signature afterwards, so
+        # nothing here should assume a certificate exists.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+
+# Declared explicitly rather than relying on auto-generation, so `xcodebuild
+# -scheme WakeSpike` is guaranteed to resolve in CI.
+schemes:
+  WakeSpike:
+    build:
+      targets:
+        WakeSpike: all
+    run:
+      config: Debug
+    archive:
+      config: Release

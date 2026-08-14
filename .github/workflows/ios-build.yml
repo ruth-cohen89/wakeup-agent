@@ -1,0 +1,150 @@
+name: iOS build
+
+# Compile gate for the AlarmKit spike.
+#
+# Development happens on Windows and there is no Mac available, so this runner is
+# the only thing that ever compiles this code. It answers exactly one question:
+# do the AlarmKit API signatures in AlarmService.swift actually exist?
+#
+# It deliberately does NOT sign the app. A free Apple Personal Team cannot be
+# signed in CI — see docs/signing-feasibility.md for the exact Apple limitation.
+# The artifact is an UNSIGNED .ipa, signed and installed later by Sideloadly on
+# Windows (docs/install-from-windows.md).
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compile unsigned (iOS 26)
+    # Pinned deliberately. macos-latest still resolves to an image whose default
+    # Xcode is 16.4, which has no iOS 26 SDK, so `import AlarmKit` would fail with
+    # a confusing "no such module" rather than a real API error.
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      # Oldest iOS 26 Xcode on the image. We target the lowest SDK the app claims
+      # to support (iOS 26.0) rather than only proving it builds against the newest.
+      XCODE_APP: /Applications/Xcode_26.0.1.app
+      PROJECT_DIR: ios/WakeSpike
+      SCHEME: WakeSpike
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::warning::$XCODE_APP not present on this image; falling back to default Xcode."
+            echo "Available Xcodes:"
+            ls -1 /Applications | grep -i '^Xcode' || true
+          else
+            sudo xcode-select -s "$XCODE_APP"
+          fi
+
+      # Recorded so docs/alarmkit-findings.md can state the exact toolchain that
+      # proved (or disproved) each signature.
+      - name: Record toolchain
+        run: |
+          set -euo pipefail
+          echo "## Toolchain" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          sw_vers | tee -a "$GITHUB_STEP_SUMMARY"
+          xcodebuild -version | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "--- iOS SDKs ---" | tee -a "$GITHUB_STEP_SUMMARY"
+          xcodebuild -showsdks 2>/dev/null | grep -i ios | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The repo has no .xcodeproj on purpose — it is generated from project.yml so
+      # the project never has to be created in the Xcode GUI, which was the last
+      # step that genuinely required a Mac.
+      - name: Generate Xcode project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild -list -project WakeSpike.xcodeproj
+
+      # Unsigned on purpose. CODE_SIGNING_ALLOWED=NO lets a machine with no
+      # certificates, no provisioning profile and no registered device still prove
+      # the code compiles for real arm64 hardware.
+      - name: Build unsigned archive
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          xcodebuild \
+            -project WakeSpike.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/WakeSpike.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            2>&1 | tee build.log
+
+      # Standard unsigned-ipa packaging: Products/Applications -> Payload/ -> zip.
+      - name: Package unsigned IPA
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          APP_DIR="build/WakeSpike.xcarchive/Products/Applications"
+          if [ ! -d "$APP_DIR" ]; then
+            echo "::error::No .app produced at $APP_DIR"
+            exit 1
+          fi
+          rm -rf build/Payload
+          mkdir -p build/Payload
+          cp -R "$APP_DIR"/*.app build/Payload/
+          (cd build && zip -qry WakeSpike-unsigned.ipa Payload)
+          echo "## Artifact" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh build/WakeSpike-unsigned.ipa | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Contents:" >> "$GITHUB_STEP_SUMMARY"
+          unzip -l build/WakeSpike-unsigned.ipa | head -20 >> "$GITHUB_STEP_SUMMARY"
+
+      # Confirms the bundled alarm sounds actually made it into the app, which is a
+      # prerequisite for the custom-sound device test.
+      - name: Verify bundled resources
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          APP=$(ls -d build/Payload/*.app)
+          echo "Bundle contents:"
+          ls -R "$APP" | head -40
+          for s in gentle_chime.wav warning_pulse.wav buzzer.wav siren.wav; do
+            if find "$APP" -name "$s" | grep -q .; then
+              echo "  ok  $s"
+            else
+              echo "::warning::$s missing from app bundle"
+            fi
+          done
+
+      - name: Upload unsigned IPA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WakeSpike-unsigned-ipa
+          path: ${{ env.PROJECT_DIR }}/build/WakeSpike-unsigned.ipa
+          if-no-files-found: warn
+          retention-days: 30
+
+      # Uploaded even on failure — this is how build errors get read from Windows.
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ env.PROJECT_DIR }}/build.log
+          if-no-files-found: warn
+          retention-days: 30

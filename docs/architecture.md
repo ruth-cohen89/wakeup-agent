@@ -140,6 +140,54 @@ should survive into implementation:
 
 ---
 
+---
+
+## Build and delivery pipeline
+
+Development happens on Windows with no Mac available, so the toolchain is split
+across three machines:
+
+```
+Windows            edit Swift, commit, push
+   │
+   ▼
+GitHub Actions     macos-26 · Xcode 26 · iOS 26 SDK · free on public repos
+   │               xcodegen generate  →  xcodebuild archive (UNSIGNED)
+   │               →  WakeSpike-unsigned.ipa artifact
+   ▼
+Windows            Sideloadly + free secondary Apple ID
+   │               certificate · device registration · provisioning · re-sign
+   ▼
+iPhone             install over USB, trust profile, run the device protocol
+   │
+   └──────────────  re-sign every ~7 days (Apple free-tier rule)
+```
+
+Four capabilities, three of which CI cannot provide:
+
+| Capability | Where | Why not CI |
+|---|---|---|
+| Compile | GitHub Actions | — |
+| Code sign | Windows | Free accounts get no developer-portal certificates |
+| Provision | Windows | App Store Connect API keys need a paid membership |
+| Install | Windows, USB | A cloud runner has no iPhone attached |
+
+Full reasoning and citations: `signing-feasibility.md`.
+
+### Consequence for the product
+
+**The alarm cannot be your only alarm while certificates expire weekly.** Keep a
+normal iOS Clock alarm as a backup until the signing situation is stable. This is
+a product-level caveat, not just an ops detail.
+
+### Consequence for the code
+
+`project.yml` is now load-bearing — there is no `.xcodeproj` in the repo and none
+should be committed. CI generates it. This removed the last step that genuinely
+required a Mac.
+
+---
+
 ## Cost
 
-Zero. See `cost.md`.
+Zero, conditional on the repo staying public. See `cost.md`.

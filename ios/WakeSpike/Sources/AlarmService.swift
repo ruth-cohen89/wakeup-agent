@@ -6,10 +6,17 @@ import AppIntents
 /// Every AlarmKit call site in the spike lives in this file.
 ///
 /// This code was written on Windows against Apple's documented AlarmKit symbols
-/// (WWDC25 session 230 and the AlarmKit reference). It has never been compiled.
-/// Each place where a signature could not be confirmed from documentation alone
-/// is marked `// SPIKE-VERIFY:` — those are the expected build errors on the Mac,
-/// and each one is a row to fill in `docs/alarmkit-findings.md`.
+/// (WWDC25 session 230 and the AlarmKit reference). There is no Mac on this
+/// project — it is compiled by the GitHub Actions `macos-26` runner
+/// (`.github/workflows/ios-build.yml`), which is the only compiler it ever sees.
+///
+/// Each place where a signature could not be confirmed from documentation alone is
+/// marked `// SPIKE-VERIFY:` — those are the expected CI build errors, and each is
+/// a row to fill in `docs/alarmkit-findings.md`.
+///
+/// A green build proves the *signature* exists. It proves nothing about runtime
+/// behaviour, so markers are narrowed after a successful compile, never deleted.
+/// They close only when the device test confirms the behaviour.
 ///
 /// Nothing here invents behaviour. Where the API shape was genuinely unknown the
 /// uncertainty is stated rather than guessed around.
