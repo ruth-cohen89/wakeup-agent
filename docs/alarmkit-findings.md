@@ -10,7 +10,7 @@ Evidence lands here in two stages, and they prove different things:
 A green build does **not** close a `// SPIKE-VERIFY:` marker. It narrows it: the
 signature is right, the behaviour is still unknown. Markers close only in stage B.
 
-**Stage A status: not yet run.**
+**Stage A status: PASS — green build on 2026-08-14, three CI iterations.**
 **Stage B status: EMPTY — awaiting the physical device.**
 
 Phase 0 is not complete and Phase 1 does not start until stage B is filled in.
@@ -24,14 +24,15 @@ Test numbers refer to `00-phase0-spike.md`. Fill in *every* row, including hones
 
 | | |
 |---|---|
-| Date of run | |
-| Workflow run URL | |
+| Date of run | 2026-08-14 |
+| Workflow run URL | https://github.com/ruth-cohen89/wakeup-agent/actions/runs/31830358071 |
 | Runner image | `macos-26` |
-| macOS version | |
-| Xcode version | |
-| iOS SDK compiled against | |
-| Result | not yet run |
-| Unsigned `.ipa` produced? | |
+| macOS version | (logged in run output) |
+| Xcode version | Xcode 26.0.1 (`/Applications/Xcode_26.0.1.app`) |
+| iOS SDK compiled against | iOS 26.0 |
+| Result | **PASS** — green build after 3 iterations |
+| Unsigned `.ipa` produced? | Yes — `WakeSpike-unsigned.ipa` artifact uploaded |
+| CI iterations | Run 1: `AlertConfiguration` / `AlarmConfiguration` not in scope. Run 2: `OpenWakeIntent` didn't conform to `LiveActivityIntent`. Run 3: green. |
 
 ---
 
@@ -79,16 +80,17 @@ Status values: `unverified` → `compiles` (stage A) → `behaviour confirmed` (
 
 | Assumed | Actual | Status |
 |---|---|---|
-| `AlarmManager.shared.authorizationState` | | unverified |
-| `try await AlarmManager.shared.requestAuthorization()` | | unverified |
-| `AlarmMetadata` conformance requirements | | unverified |
-| `secondaryButtonBehavior: .custom` | | unverified |
-| `AlertConfiguration.AlertSound.named(_:)` | | unverified |
-| `AlarmConfiguration(schedule:attributes:secondaryIntent:sound:)` | | unverified |
-| `AlarmManager.shared.cancel(id:)` | | unverified |
+| `AlarmManager.shared.authorizationState` | Same — compiles as written | compiles |
+| `try await AlarmManager.shared.requestAuthorization()` | Same — compiles as written | compiles |
+| `AlarmMetadata` conformance requirements | `WakeMetadata: AlarmMetadata` compiles with `Codable`-compatible fields | compiles |
+| `secondaryButtonBehavior: .custom` | Same — compiles as written | compiles |
+| `AlertConfiguration.AlertSound.named(_:)` | Same type path, but requires `import ActivityKit` (not re-exported by AlarmKit) | compiles |
+| `AlarmConfiguration(schedule:attributes:secondaryIntent:sound:)` | `AlarmManager.AlarmConfiguration<M>.alarm(schedule:attributes:stopIntent:secondaryIntent:sound:)` — nested under `AlarmManager`, uses `.alarm()` factory, has additional `stopIntent:` parameter | compiles |
+| `AlarmManager.shared.cancel(id:)` | Same — compiles as written | compiles |
+| `OpenWakeIntent: AppIntent` (implicit) | Must conform to `LiveActivityIntent` (extends `AppIntent`), requires `import ActivityKit` | compiles |
 
-All seven live in `ios/WakeSpike/Sources/AlarmService.swift`, the only file that
-touches AlarmKit.
+All live in `ios/WakeSpike/Sources/AlarmService.swift` and `OpenWakeIntent.swift`.
+Three corrections were needed; the other five compiled as originally guessed.
 
 ---
 
