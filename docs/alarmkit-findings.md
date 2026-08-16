@@ -10,7 +10,9 @@ Evidence lands here in two stages, and they prove different things:
 A green build does **not** close a `// SPIKE-VERIFY:` marker. It narrows it: the
 signature is right, the behaviour is still unknown. Markers close only in stage B.
 
-**Stage A status: PASS — green build on 2026-08-14, three CI iterations.**
+**Stage A status: PASS — green build on 2026-08-14, three CI iterations.
+Re-confirmed 2026-08-16 with two further signatures (`AlarmManager.alarms`,
+`Alarm.Schedule.Relative`), both green first try.**
 **Stage B status: EMPTY — awaiting the physical device.**
 
 Phase 0 is not complete and Phase 1 does not start until stage B is filled in.
@@ -66,7 +68,7 @@ Test numbers refer to `00-phase0-spike.md`. Fill in *every* row, including hones
 | 8b | Is an invalid / regenerated-stale QR rejected? | unknown | |
 | 9 | Do pending alarms survive a full power cycle? | unknown | Decides SYSTEM_UNAVAILABLE handling |
 | 10 | Is `.wav` accepted, or is `.caf` required? | unknown | |
-| 11 | Does a `.relative` weekly alarm re-arm after Stop? | unknown | Possible cheap alternative to long chains |
+| 11 | Does a `.relative` weekly alarm re-arm after Stop? | unknown | Possible cheap alternative to long chains. Construction compiles (stage A); runtime re-arm is the open part |
 | 12 | **Does AlarmKit work under a free Personal Team profile?** | unknown | New risk from the sideload route — free profiles restrict entitlements and Sideloadly re-signs the app. If alarm scheduling fails after a successful install, this is why |
 
 ---
@@ -88,9 +90,16 @@ Status values: `unverified` → `compiles` (stage A) → `behaviour confirmed` (
 | `AlarmConfiguration(schedule:attributes:secondaryIntent:sound:)` | `AlarmManager.AlarmConfiguration<M>.alarm(schedule:attributes:stopIntent:secondaryIntent:sound:)` — nested under `AlarmManager`, uses `.alarm()` factory, has additional `stopIntent:` parameter | compiles |
 | `AlarmManager.shared.cancel(id:)` | Same — compiles as written | compiles |
 | `OpenWakeIntent: AppIntent` (implicit) | Must conform to `LiveActivityIntent` (extends `AppIntent`), requires `import ActivityKit` | compiles |
+| `AlarmManager.shared.alarms` (existence, throwing-ness, async-ness all unknown) | Exists. **Throwing but not async** — probed as `try await`, compiler warned "no 'async' operations occur within 'await' expression" and said nothing about `try`. Returns a collection (`.count` typechecks) | compiles |
+| `Alarm.Schedule.Relative(time:repeats:)` + `Alarm.Schedule.Relative.Time(hour:minute:)` + `.weekly([.sunday, …])` | All correct as guessed — the whole relative-schedule construction compiled unchanged | compiles |
+| `AlarmManager.shared.schedule(id:configuration:)` returns Void | Returns a value — CI warns "result of call is unused". The spike discards it; the real product should look at what it hands back | compiles |
 
 All live in `ios/WakeSpike/Sources/AlarmService.swift` and `OpenWakeIntent.swift`.
-Three corrections were needed; the other five compiled as originally guessed.
+Three corrections were needed; the other eight compiled as originally guessed.
+
+Note the asymmetry this table hides: `AlarmManager.alarms` compiling proves a
+*count* can be read, not that the count drops when an alarm is stopped. That is
+exactly the Test 8 question and it stays stage B.
 
 ---
 

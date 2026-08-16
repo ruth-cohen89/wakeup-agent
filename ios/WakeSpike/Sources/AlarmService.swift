@@ -302,13 +302,12 @@ final class AlarmService {
     /// Ask AlarmKit — not our own bookkeeping — how many alarms are still pending.
     func refreshLiveAlarmCount() async {
         do {
-            // SPIKE-VERIFY: `AlarmManager.alarms` is documented as the collection of
-            // currently scheduled alarms, but its spelling, whether it is a property
-            // or a call, and whether it is throwing or async are all unconfirmed.
-            // Written as `try await` deliberately: if the real symbol turns out to be
-            // neither throwing nor async, those produce warnings rather than errors,
-            // so the compile gate still tells us the *name* is right.
-            let alarms = try await AlarmManager.shared.alarms
+            // SPIKE-VERIFY: CI confirmed `AlarmManager.shared.alarms` exists and is a
+            // throwing, non-async property returning something with `.count` — the
+            // probe was written `try await` and the compiler warned that no async
+            // operation occurred, while raising no complaint about `try`. Whether the
+            // collection reflects fired-and-stopped alarms is device-only.
+            let alarms = try AlarmManager.shared.alarms
             liveAlarmCount = alarms.count
             SpikeLog.shared.log("live alarm count = \(alarms.count) (app believes \(scheduledIDs.count))")
         } catch {
