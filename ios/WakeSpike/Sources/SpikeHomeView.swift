@@ -12,6 +12,7 @@ struct SpikeHomeView: View {
     @State private var showingLog = false
     @State private var capTestCount = 5
     @State private var selfCheckResult: String?
+    @State private var repeatingTime = Date()
 
     var body: some View {
         NavigationStack {
@@ -20,13 +21,18 @@ struct SpikeHomeView: View {
                 singleAlarmSection
                 capTestSection
                 chainSection
+                rebootSection
+                repeatingSection
                 qrSection
                 logSection
             }
             .navigationTitle("WakeSpike")
             .sheet(isPresented: $showingQR) { qrSheet }
             .sheet(isPresented: $showingLog) { logSheet }
-            .onAppear { alarms.refreshAuthorizationState() }
+            .onAppear {
+                alarms.refreshAuthorizationState()
+                Task { await alarms.refreshLiveAlarmCount() }
+            }
         }
     }
 
@@ -98,7 +104,12 @@ struct SpikeHomeView: View {
                 )
                 Task { await alarms.scheduleChain(planned) }
             }
-            LabeledContent("Currently scheduled", value: "\(alarms.scheduledIDs.count)")
+            LabeledContent("App believes scheduled", value: "\(alarms.scheduledIDs.count)")
+            LabeledContent("iOS actually holds", value: liveCountText)
+                .font(.subheadline.bold())
+            Button("Refresh from AlarmKit") {
+                Task { await alarms.refreshLiveAlarmCount() }
+            }
             if let error = alarms.lastError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
@@ -108,8 +119,14 @@ struct SpikeHomeView: View {
         } header: {
             Text("Test 4 — Maximum alarm count ⚠️")
         } footer: {
-            Text("The blocker. Try 5, 20, 50, 100. Watch 'Currently scheduled' and the log for where it stops. If the cap is below the real-morning number above, the chain design has to change. Cancel all between runs.")
+            Text("The blocker. Try 5, 20, 50, 100. Watch 'iOS actually holds' and the log for where it stops — the app's own count only records schedule calls that returned success. If the cap is below the real-morning number above, the chain design has to change. Cancel all between runs.")
         }
+    }
+
+    /// `nil` means the AlarmKit query itself failed, which is a different — and more
+    /// interesting — result than zero alarms.
+    private var liveCountText: String {
+        alarms.liveAlarmCount.map(String.init) ?? "query failed"
     }
 
     // MARK: Test 5
@@ -130,6 +147,47 @@ struct SpikeHomeView: View {
             Text("Test 5 — Stop independence")
         } footer: {
             Text("Slide Stop on the first alarm. The second must still fire. This is the single behaviour the whole 'keep trying after 08:15' design rests on.")
+        }
+    }
+
+    // MARK: Test 9
+
+    private var rebootSection: some View {
+        Section {
+            Button("Chain of 5, 2 min apart, starting in 10 min") {
+                let start = Date().addingTimeInterval(10 * 60)
+                let planned = ChainPlanner.compressedPlan(start: start, spacingSeconds: 120, count: 5)
+                Task { await alarms.scheduleChain(planned) }
+            }
+        } header: {
+            Text("Test 9 — Survival across reboot")
+        } footer: {
+            Text("Ten minutes is the point: long enough to power the phone fully off and back on before the first alarm is due, short enough not to lose the session waiting. Schedule, power off, wait a minute, power on, and do not open the app.")
+        }
+    }
+
+    // MARK: Test 11
+
+    private var repeatingSection: some View {
+        Section {
+            DatePicker(
+                "Fire at",
+                selection: $repeatingTime,
+                displayedComponents: .hourAndMinute
+            )
+            Button("Schedule repeating Sun–Thu alarm") {
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: repeatingTime)
+                Task {
+                    await alarms.scheduleRepeatingWeekly(
+                        hour: parts.hour ?? 8,
+                        minute: parts.minute ?? 0
+                    )
+                }
+            }
+        } header: {
+            Text("Test 11 — Repeating weekly alarm")
+        } footer: {
+            Text("The escape route if Test 4 finds a low cap. One repeating alarm that re-arms itself after Stop would make a production morning cost a handful of alarms instead of \(realMorningDemand). Set a time two minutes out, let it fire, slide Stop, and check tomorrow — or just confirm it schedules at all.")
         }
     }
 

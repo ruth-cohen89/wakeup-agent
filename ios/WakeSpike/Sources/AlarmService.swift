@@ -253,6 +253,16 @@ final class AlarmService {
     private(set) var lastError: String?
     private(set) var authorizationText: String = "unknown"
 
+    /// What iOS actually still holds, as distinct from what this app believes it
+    /// scheduled.
+    ///
+    /// `scheduledIDs` only ever grows on a successful `schedule()` and empties on
+    /// `cancelAll()` — it never learns that an alarm fired or was dismissed. Test 8
+    /// asserts "Currently scheduled dropped to 0", and that assertion is worth
+    /// nothing if the number comes from our own array rather than from AlarmKit.
+    /// `nil` means the query itself failed.
+    private(set) var liveAlarmCount: Int?
+
     /// Chain IDs persist so the app can cancel the remainder after a QR scan even
     /// if it was killed and relaunched from the lock screen in between.
     private let storageKey = "wakespike.scheduled.ids"
@@ -287,10 +297,31 @@ final class AlarmService {
         }
     }
 
+    // MARK: Live state
+
+    /// Ask AlarmKit — not our own bookkeeping — how many alarms are still pending.
+    func refreshLiveAlarmCount() async {
+        do {
+            // SPIKE-VERIFY: `AlarmManager.alarms` is documented as the collection of
+            // currently scheduled alarms, but its spelling, whether it is a property
+            // or a call, and whether it is throwing or async are all unconfirmed.
+            // Written as `try await` deliberately: if the real symbol turns out to be
+            // neither throwing nor async, those produce warnings rather than errors,
+            // so the compile gate still tells us the *name* is right.
+            let alarms = try await AlarmManager.shared.alarms
+            liveAlarmCount = alarms.count
+            SpikeLog.shared.log("live alarm count = \(alarms.count) (app believes \(scheduledIDs.count))")
+        } catch {
+            liveAlarmCount = nil
+            record(error, context: "query live alarms")
+        }
+    }
+
     // MARK: Scheduling
 
     /// Test 2 in the protocol: a single alarm, default 60s out.
     func scheduleSingle(secondsFromNow: Int = 60, stage: WakeStage = .gentle) async {
+        lastError = nil
         let fireDate = Date().addingTimeInterval(TimeInterval(secondsFromNow))
         let planned = PlannedAlarm(
             id: UUID(),
@@ -313,6 +344,9 @@ final class AlarmService {
     /// way to make a single alarm un-dismissable, so independence is what makes
     /// "keep trying after 08:15" possible at all.
     func scheduleChain(_ planned: [PlannedAlarm]) async {
+        // Cleared per run, otherwise the failure from a cap test at 100 is still on
+        // screen during the next run at 5 and reads as a fresh error.
+        lastError = nil
         SpikeLog.shared.log("--- scheduling chain of \(planned.count) ---")
         var succeeded = 0
         for alarm in planned {
@@ -328,10 +362,51 @@ final class AlarmService {
             }
         }
         SpikeLog.shared.log("--- chain result: \(succeeded)/\(planned.count) scheduled ---")
+        await refreshLiveAlarmCount()
     }
 
+    // MARK: Test 11 — repeating weekly alarm
+
+    /// One `.relative` alarm with a Sun–Thu recurrence, instead of a chain of
+    /// one-shot `.fixed` alarms.
+    ///
+    /// This is the designated fallback if Test 4 finds a low alarm cap: if a single
+    /// repeating alarm re-arms itself after Stop, a production morning costs a
+    /// handful of alarms rather than 46. The protocol asks for this result, so the
+    /// app has to be able to produce it.
+    func scheduleRepeatingWeekly(hour: Int, minute: Int, stage: WakeStage = .gentle) async {
+        lastError = nil
+        let planned = PlannedAlarm(
+            id: UUID(),
+            chainID: UUID(),
+            // Unused by a relative schedule; recorded so the log line reads sensibly.
+            fireDate: Date(),
+            stage: stage,
+            soundFileName: stage.soundFileName,
+            indexInChain: 0
+        )
+
+        // SPIKE-VERIFY: the entire relative-schedule construction. Documented as a
+        // time-of-day plus a recurrence, but the nesting (`Alarm.Schedule.Relative`),
+        // the `Time` initialiser and the spelling of the weekly recurrence case are
+        // all unconfirmed. Expect this to be the line CI rejects.
+        let relative = Alarm.Schedule.Relative(
+            time: Alarm.Schedule.Relative.Time(hour: hour, minute: minute),
+            repeats: .weekly([.sunday, .monday, .tuesday, .wednesday, .thursday])
+        )
+
+        let ok = await schedule(planned, using: .relative(relative))
+        SpikeLog.shared.log(
+            "scheduled repeating weekly \(String(format: "%02d:%02d", hour, minute)) Sun–Thu, stage=\(stage.rawValue) -> \(ok)"
+        )
+        await refreshLiveAlarmCount()
+    }
+
+    /// - Parameter using: overrides the default one-shot `.fixed(fireDate)` schedule.
+    ///   Test 11 passes a `.relative` recurrence through here; everything else uses
+    ///   the default so the two paths share one configuration builder.
     @discardableResult
-    private func schedule(_ planned: PlannedAlarm) async -> Bool {
+    private func schedule(_ planned: PlannedAlarm, using overrideSchedule: Alarm.Schedule? = nil) async -> Bool {
         do {
             let stopButton = AlarmButton(
                 text: "Stop",
@@ -379,7 +454,7 @@ final class AlarmService {
             // compiles. Runtime behaviour (stopIntent: nil default, secondaryIntent
             // launching the app) still needs device verification.
             let configuration = AlarmManager.AlarmConfiguration<WakeMetadata>.alarm(
-                schedule: .fixed(planned.fireDate),
+                schedule: overrideSchedule ?? .fixed(planned.fireDate),
                 attributes: attributes,
                 stopIntent: nil,
                 secondaryIntent: OpenWakeIntent(stageRaw: planned.stage.rawValue),
@@ -414,6 +489,8 @@ final class AlarmService {
         scheduledIDs.removeAll()
         persist()
         SpikeLog.shared.log("cancelAll complete")
+        // Emptying our own array proves nothing. Test 8 needs AlarmKit's number.
+        await refreshLiveAlarmCount()
     }
 
     // MARK: Errors

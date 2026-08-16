@@ -54,7 +54,12 @@ it stopped by itself.
 The app shows **"A real morning needs N alarms"** at the top of this section. That
 is the number to clear.
 
-- [ ] Set the stepper to 5 → **Run cap test** → note "Currently scheduled" → **Cancel all**
+The section shows two counts. **"App believes scheduled"** is our own array — it only
+counts `schedule()` calls that returned success. **"iOS actually holds"** comes from
+AlarmKit itself. Record the second one; where they disagree, that disagreement is a
+finding in its own right.
+
+- [ ] Set the stepper to 5 → **Run cap test** → note "iOS actually holds" → **Cancel all**
 - [ ] Repeat at 20
 - [ ] Repeat at 50
 - [ ] Repeat at 100
@@ -108,7 +113,8 @@ this determines how the real app gets launched.
 - [ ] Schedule the 6-alarm compressed chain.
 - [ ] Let one or two fire. Walk to the kitchen. Open the scanner. Scan.
 
-Record: the verified timestamp, and that "Currently scheduled" dropped to 0.
+Record: the verified timestamp, and that **"iOS actually holds"** dropped to 0 — not
+just the app's own count, which clears itself regardless of what AlarmKit did.
 
 - [ ] Try scanning something else (any other QR) → must show **Not your code**.
 - [ ] Tap **Regenerate token**, then scan the *old printout* → must be rejected.
@@ -116,7 +122,7 @@ Record: the verified timestamp, and that "Currently scheduled" dropped to 0.
 
 ## Test 9 — Survival across reboot
 
-- [ ] Schedule a chain starting ~10 minutes out.
+- [ ] Tap **Chain of 5, 2 min apart, starting in 10 min** under "Test 9".
 - [ ] Power the iPhone fully off, wait a minute, power on. **Do not open the app.**
 
 Record: did the alarms still fire? This decides whether `SYSTEM_UNAVAILABLE`
@@ -128,12 +134,21 @@ Covered in Test 3; record the conclusion explicitly: WAV accepted, or CAF requir
 
 ## Test 11 — Repeating weekly alarms
 
-`AlarmService` currently schedules `.fixed` dates. If time allows, try a
-`.relative` schedule with a Sun–Thu recurrence.
+Everything above schedules `.fixed` one-shots. This is the one `.relative` path.
+
+- [ ] Under "Test 11", set the time picker **two minutes out** and tap
+      **Schedule repeating Sun–Thu alarm**.
+- [ ] Confirm it schedules at all — "iOS actually holds" should increase by one.
+      If the call throws, record the exact error; that alone answers the question.
+- [ ] Let it fire. Slide **Stop**.
+- [ ] Check whether it is still scheduled afterwards.
 
 Record: does one repeating alarm re-arm itself after Stop? If so, the production
-schedule can be far cheaper than 46 one-shot alarms per day — which may be the
-answer if Test 4 finds a low cap.
+schedule can be far cheaper than 46 one-shot alarms per day — which is the answer
+if Test 4 finds a low cap.
+
+> This is a contingency, not an optional extra. If Test 4 fails and Test 11 was
+> skipped, the device session has to be repeated to answer it.
 
 ---
 
