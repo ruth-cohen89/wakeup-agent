@@ -130,6 +130,39 @@ jobs:
             fi
           done
 
+      # Hard gate, not a warning. The first device session was lost to a build
+      # whose Info.plist had been silently replaced by XcodeGen's defaults: no
+      # NSAlarmKitUsageDescription, no launch screen, an app that rendered and
+      # ignored every tap. Nothing in the compile catches that. This does, and a
+      # red build costs minutes where a bad IPA costs a whole phone session.
+      - name: Verify Info.plist shipped our keys
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          APP=$(ls -d build/Payload/*.app)
+          PLIST="$APP/Info.plist"
+          PB=/usr/libexec/PlistBuddy
+          echo "## Info.plist" >> "$GITHUB_STEP_SUMMARY"
+          missing=0
+          for key in NSAlarmKitUsageDescription NSCameraUsageDescription UILaunchScreen CFBundleURLTypes; do
+            if $PB -c "Print :$key" "$PLIST" >/dev/null 2>&1; then
+              echo "  ok       $key" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::$key missing from the built Info.plist — the committed ios/WakeSpike/Info.plist is not being shipped (check INFOPLIST_FILE in project.yml)"
+              echo "  MISSING  $key" | tee -a "$GITHUB_STEP_SUMMARY"
+              missing=1
+            fi
+          done
+          # The committed plist sets this from MARKETING_VERSION (0.1). XcodeGen's
+          # generated default is 1.0, so this value alone says which file shipped.
+          version=$($PB -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null || echo "<absent>")
+          echo "  CFBundleShortVersionString = $version" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$version" = "1.0" ]; then
+            echo "::error::CFBundleShortVersionString is 1.0 (XcodeGen's default), expected MARKETING_VERSION from project.yml"
+            missing=1
+          fi
+          exit "$missing"
+
       - name: Upload unsigned IPA
         if: always()
         uses: actions/upload-artifact@v4

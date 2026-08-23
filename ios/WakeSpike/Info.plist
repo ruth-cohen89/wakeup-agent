@@ -2,6 +2,34 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Standard bundle keys. These used to be supplied by XcodeGen, which
+	     generated this file wholesale and discarded everything below. Now that
+	     the target ships this file verbatim (INFOPLIST_FILE in project.yml),
+	     they have to be declared here. Written as build-setting variables so
+	     they keep tracking project.yml rather than drifting from it. -->
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+
+	<!-- An alarm app is held in one hand at 08:00. Portrait only. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+
 	<!-- Required by AlarmKit. Without this the authorization request fails. -->
 	<key>NSAlarmKitUsageDescription</key>
 	<string>WakeSpike schedules your morning alarms and the escalating follow-ups that keep going until you scan the code in your kitchen.</string>
@@ -25,6 +53,10 @@
 		</dict>
 	</array>
 
+	<!-- Not cosmetic. Without a launch screen an app linked against the iOS 26
+	     SDK is treated as legacy and given a compatibility-sized window, so
+	     SwiftUI draws across the display while hit-testing stays inside the
+	     legacy rect — the UI renders and nothing responds to taps. -->
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

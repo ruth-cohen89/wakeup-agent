@@ -28,10 +28,15 @@ targets:
       - path: Sources
       - path: Resources
         buildPhase: resources
-    info:
-      path: Info.plist
     settings:
       base:
+        # NOT `info: path:` — that key makes XcodeGen *generate* a plist at that
+        # path from its own defaults and overwrite the committed one. It did
+        # exactly that: the shipped app carried none of our keys, so AlarmKit had
+        # no usage description and the app had no launch screen. INFOPLIST_FILE
+        # is the setting that means "ship this file"; it resolves against SRCROOT
+        # (ios/WakeSpike), and pairs with GENERATE_INFOPLIST_FILE: NO below.
+        INFOPLIST_FILE: Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.wakespike.app
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
